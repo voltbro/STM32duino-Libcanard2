@@ -1,1 +1,2 @@
-#STM32duino-Libcanard2
+# STM32duino-Libcanard2
+Simple Libcanard2 implementation for [STM32duino](https://github.com/stm32duino). This library contatins  [Libcanard](https://github.com/UAVCAN/libcanard) & [UAVCAN message definitions](https://github.com/UAVCAN/public_regulated_data_types) in C. To use simply clone this repo into your **Arduino/libraries** directory.
