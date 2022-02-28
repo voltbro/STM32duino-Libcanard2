@@ -4,12 +4,9 @@
 #include "F446_CAN.h"
 #include "F446_HSE_init.h"
 
-#define LED_BUILTIN PA5
-
 // UAVCAN related headers
 #include <libcanard/canard.h>
 #include <uavcan/node/Heartbeat_1_0.h>
-#include <uavcan/primitive/scalar/Bit_1_0.h>
 #include <uavcan/primitive/array/Real64_1_0.h>
 
 CanardInstance   canard;   // This is the core structure that keeps all of the states and allocated resources of the library instance
@@ -36,19 +33,19 @@ CanardPortID const MSG_PORT_ID = 1620U;
 
 void setup()
 {
+  // Serial interface initialization
   Serial.begin(115200);
-  pinMode(LED_BUILTIN, OUTPUT);
-  
+
+  // CAN interface initialization
   bool ret = CANInit(CAN_1000KBPS, 2);  // CAN_RX mapped to PB8, CAN_TX mapped to PB9
   if (!ret) while(true);
-    
-  // put your setup code here, to run once:
-    // UAVCAN initialization
+
+  // UAVCAN initialization
   canard = canardInit(&memAllocate, &memFree);  // Initialization of a canard instance
   canard.node_id = 96;
 
-  queue = canardTxInit( 100,                    // Limit the size of the queue at 100 frames.
-              CANARD_MTU_CAN_CLASSIC);  // Set MTU = 64 bytes. There is also CANARD_MTU_CAN_CLASSIC.
+  queue = canardTxInit( 100,                      // Limit the size of the queue at 100 frames.
+                        CANARD_MTU_CAN_CLASSIC);  // Set MTU = 64 bytes. There is also CANARD_MTU_CAN_CLASSIC.
 
   CanardRxSubscription subscription; // Transfer subscription state.
 
@@ -59,7 +56,7 @@ void setup()
                         CANARD_DEFAULT_TRANSFER_ID_TIMEOUT_USEC,
                         &subscription) != 1 )
                         {
-                          Error_Handler();
+                          Serial.println("Failed to subscribe");
                         }                
 }
 
@@ -74,7 +71,7 @@ void loop()
   // Serialize the heartbeat message
   if (uavcan_node_Heartbeat_1_0_serialize_(&test_heartbeat, hbeat_ser_buf, &hbeat_ser_buf_size) < 0)
   {
-    Serial.println("Serialization failed");
+    Serial.println("Failed to serialize");
   }
 
   // Create a transfer for the heartbeat message
@@ -87,14 +84,14 @@ void loop()
   };
 
   if( canardTxPush( &queue,                 // Call this once per redundant CAN interface (queue)
-            &canard,
-            0,              // Zero if transmission deadline is not limited.
-            &transfer_metadata,
-            hbeat_ser_buf_size,   // Size of the message payload (see Nunavut transpiler)
-            hbeat_ser_buf) < 0 )
-            {
-              Serial.println("Failed to add message into queue");
-            }
+                    &canard,
+                    0,                      // Zero if transmission deadline is not limited.
+                    &transfer_metadata,
+                    hbeat_ser_buf_size,     // Size of the message payload (see Nunavut transpiler)
+                    hbeat_ser_buf) < 0 )
+                    {
+                      Serial.println("Failed to add message into queue");
+                    }
 
   uint32_t timestamp = millis();
 
@@ -103,7 +100,6 @@ void loop()
   {
     process_canard_TX_queue();
     process_canard_receiption();
-    //delay(10);
   }
 
   // Increment the transfer_id variable
@@ -161,6 +157,8 @@ void process_canard_TX_queue(void)
     // After the frame is transmitted or if it has timed out while waiting, pop it from the queue and deallocate:
     canard.memory_free(&canard, canardTxPop(&queue, ti));
   }
+
+  return ;
 }
 
 void process_canard_receiption(void)
@@ -179,7 +177,7 @@ void process_canard_receiption(void)
   
     CanardRxTransfer transfer;
 
-    CanardRxSubscription dummy;
+    CanardRxSubscription dummy; // canardRxAccept fails without this struct
 
     if( canardRxAccept( (CanardInstance *const)&canard,
               micros(),
@@ -196,7 +194,7 @@ void process_canard_receiption(void)
   
     if ( uavcan_primitive_array_Real64_1_0_deserialize_( &array, (uint8_t*)transfer.payload, &array_ser_buf_size) < 0)
     {
-      
+      Serial.println("Failed to deserialize");
     }
   
     canard.memory_free(&canard, transfer.payload);
